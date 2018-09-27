@@ -5,6 +5,7 @@
 
 import os
 import backend_common
+import cli_common.taskcluster
 import shipit_api.config
 import shipit_api.models  # noqa
 
@@ -19,10 +20,17 @@ def create_app(config=None):
             'security',
             'cors',
             'api',
-            'auth',
             'auth0',
             'db',
         ],
     )
+
+    app.notify = cli_common.taskcluster.get_service(
+        'notify',
+        app.config.get('TASKCLUSTER_CLIENT_ID'),
+        app.config.get('TASKCLUSTER_ACCESS_TOKEN')
+    )
+
     app.api.register(os.path.join(os.path.dirname(__file__), 'api.yml'))
+
     return app

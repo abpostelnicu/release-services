@@ -12,10 +12,8 @@ import taskcluster
 from sqlalchemy.orm.exc import NoResultFound
 from werkzeug.exceptions import BadRequest
 
-from backend_common.auth import auth
 from backend_common.auth0 import mozilla_accept_token
 from cli_common.log import get_logger
-from shipit_api.config import SCOPE_PREFIX
 from shipit_api.models import Phase
 from shipit_api.models import Release
 from shipit_api.tasks import ActionsJsonNotFound
@@ -31,6 +29,18 @@ _tc_params = {
     },
     'maxRetries': 12,
 }
+
+
+def notify_via_irc(message):
+    owners = flask.current_app.config.get('IRC_NOTIFICATIONS_OWNERS')
+    channel = flask.current_app.config.get('IRC_NOTIFICATIONS_CHANNEL')
+
+    if owners and channel:
+        owners = ': '.join(owners)
+        flask.current_app.notify.irc({
+            'channel': channel,
+            'message': f'{owners}: {message}',
+        })
 
 
 def _queue():
@@ -85,9 +95,13 @@ def add_release(body):
         )
         session.add(r)
         session.commit()
-        return r.json, 201
+        release = r.json
     except UnsupportedFlavor as e:
         raise BadRequest(description=e.description)
+
+    notify_via_irc(f'New release ({r.product} {r.version} build{r.build_number}) was just created.')
+
+    return release, 201
 
 
 def list_releases(product=None, branch=None, version=None, build_number=None,
@@ -153,6 +167,12 @@ def schedule_phase(name, phase):
     if all([ph.submitted for ph in phase.release.phases]):
         phase.release.status = 'shipped'
     session.commit()
+
+    notify_via_irc(f'Phase {phase.name} was just scheduled '
+                   f'for release {phase.release.product} {phase.release.version} '
+                   f'build{phase.release.build_number} - '
+                   f'(https://tools.taskcluster.net/groups/{phase.task_id})')
+
     return phase.json
 
 
@@ -162,9 +182,9 @@ def schedule_phase(name, phase):
 def abandon_release(name):
     session = flask.g.db.session
     try:
-        release = session.query(Release).filter(Release.name == name).one()
+        r = session.query(Release).filter(Release.name == name).one()
         # Cancel all submitted task groups first
-        for phase in filter(lambda x: x.submitted, release.phases):
+        for phase in filter(lambda x: x.submitted, r.phases):
             try:
                 actions = fetch_actions_json(phase.task_id)
             except ActionsJsonNotFound:
@@ -185,34 +205,12 @@ def abandon_release(name):
             res = _hooks().triggerHook(hook['hook_group_id'], hook['hook_id'], hook['hook_payload'])
             log.debug('Done: %s', res)
 
-        release.status = 'aborted'
+        r.status = 'aborted'
         session.commit()
-        return release.json
+        release = r.json
     except NoResultFound:
         flask.abort(404)
 
+    notify_via_irc(f'Release {r.product} {r.version} build{r.build_number} was just canceled.')
 
-@auth.require_scopes([SCOPE_PREFIX + '/sync_releases'])
-def sync_releases(releases):
-    session = flask.g.db.session
-    for release in releases:
-        try:
-            session.query(Release).filter(Release.name == release['name']).one()
-            # nothing todo
-        except NoResultFound:
-            status = 'shipped'
-            if not release['shippedAt']:
-                status = 'aborted'
-            r = Release(
-                product=release['product'],
-                version=release['version'],
-                branch=release['branch'],
-                revision=release['mozillaRevision'],
-                build_number=release['buildNumber'],
-                release_eta=release.get('release_eta'),
-                partial_updates=release.get('partials'),
-                status=status,
-            )
-            session.add(r)
-            session.commit()
-    return flask.jsonify({'ok': 'ok'})
+    return release

@@ -79,7 +79,7 @@ PROJECTS_CONFIG = {
             'data_dir': os.path.join(TMP_DIR, 'redis'),
         },
     },
-    'releng-notification-policy': {
+    'notification/policy': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -120,7 +120,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-notification-identity': {
+    'notification/identity': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -161,7 +161,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-docs': {
+    'docs': {
         'run': 'SPHINX',
         'run_options': {
             'schema': 'http',
@@ -196,13 +196,13 @@ PROJECTS_CONFIG = {
             'port': 8010,
         },
         'requires': [
-            'releng-docs',
-            'releng-tooltool',
-            'releng-tokens',
-            'releng-treestatus',
-            'releng-mapper',
-            'releng-notification-policy',
-            'releng-notification-identity',
+            'docs',
+            'tooltool/api',
+            'tokens/api',
+            'treestatus/api',
+            'mapper/api',
+            'notification/policy',
+            'notification/identity',
         ],
         'deploys': [
             {
@@ -240,7 +240,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-mapper': {
+    'mapper/api': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -281,7 +281,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-tokens': {
+    'tokens/api': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -322,7 +322,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-tooltool': {
+    'tooltool/api': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -432,7 +432,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'releng-treestatus': {
+    'treestatus/api': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -661,7 +661,7 @@ PROJECTS_CONFIG = {
             },
         ],
     },
-    'shipit-pulse-listener': {
+    'pulselistener': {
         'checks': [
             ('Checking code quality', 'flake8'),
             ('Running tests', 'pytest tests/'),
@@ -791,7 +791,6 @@ PROJECTS_CONFIG = {
         },
         'requires': [
             'postgresql',
-            'redis',
         ],
         'deploys': [
             {
@@ -880,44 +879,46 @@ PROJECTS_CONFIG = {
             {
                 'target': 'S3',
                 'options': {
-                    # FIXME: temporarily disable staging, production, point testing to staging
-                    'staging': {
+                    'testing': {
                         's3_bucket': 'shipit-testing-frontend',
                         'url': 'https://shipit.testing.mozilla-releng.net',
                         'dns': 'd2jpisuzgldax2.cloudfront.net.',
                         'envs': {
                             # Use the same API as staging
+                            'CONFIG': 'testing',
+                        },
+                        'csp': [
+                            'https://hg.mozilla.org',
+                            'https://queue.taskcluster.net',
+                            'https://auth.mozilla.auth0.com',
+                        ],
+                    },
+                    'staging': {
+                        's3_bucket': 'shipit-staging-frontend',
+                        'url': 'https://shipit.staging.mozilla-releng.net',
+                        'dns': 'd2ld4e8bl8yd1l.cloudfront.net.',
+                        'envs': {
                             'CONFIG': 'staging',
                         },
                         'csp': [
                             'https://hg.mozilla.org',
                             'https://queue.taskcluster.net',
+                            'https://auth.mozilla.auth0.com',
                         ],
                     },
-                    # 'staging': {
-                    #     's3_bucket': 'shipit-staging-frontend',
-                    #     'url': 'https://shipit.staging.mozilla-releng.net',
-                    #     'dns': 'd2ld4e8bl8yd1l.cloudfront.net.',
-                    #     'envs': {
-                    #         'CONFIG': 'staging',
-                    #     },
-                    #     'csp': [
-                    #         'https://hg.mozilla.org',
-                    #         'https://queue.taskcluster.net',
-                    #     ],
-                    # },
-                    # 'production': {
-                    #     's3_bucket': 'shipit-production-frontend',
-                    #     'url': 'https://shipit.mozilla-releng.net',
-                    #     'dns': 'dve8yd1431ifz.cloudfront.net.',
-                    #     'envs': {
-                    #         'CONFIG': 'production',
-                    #     },
-                    #     'csp': [
-                    #         'https://hg.mozilla.org',
-                    #         'https://queue.taskcluster.net',
-                    #     ],
-                    # },
+                    'production': {
+                        's3_bucket': 'shipit-production-frontend',
+                        'url': 'https://shipit.mozilla-releng.net',
+                        'dns': 'dve8yd1431ifz.cloudfront.net.',
+                        'envs': {
+                            'CONFIG': 'production',
+                        },
+                        'csp': [
+                            'https://hg.mozilla.org',
+                            'https://queue.taskcluster.net',
+                            'https://auth.mozilla.auth0.com',
+                        ],
+                    },
                 },
             },
         ],
